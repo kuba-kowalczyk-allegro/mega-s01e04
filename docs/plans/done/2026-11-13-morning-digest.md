@@ -1,8 +1,9 @@
 ---
 plan: morning-digest
-status: ready
+status: done
 owner: rook
 opened: 2026-10-29
+closed: 2026-11-13
 ---
 
 # Morning digest
@@ -77,3 +78,27 @@ page again with `LANE_MARKER` unset (the banner reads "no marker set") and uploa
 link. Move this plan to `docs/plans/done/` with its issue list.
 
 Done when: the preview link no longer shows the lane marker.
+
+## Issues
+
+| # | Issue | Source section and scope |
+|---|-------|--------------------------|
+| [#1](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/1) | Shared digest contract | §1: define `DigestRow` and the `readNight(runsDir, night)` signature so dependent work can start. |
+| [#2](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/2) | Run log reader | §1: parse and validate JSONL, aggregate jobs, retain missing owners, count bad lines, and test the reader. |
+| [#3](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/3) | Digest page | §2a: render `GET /digest/:night` with sorted jobs, retry/failure marks, missing-night 404, and empty-night state. |
+| [#4](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/4) | Digest JSON | §2b: serve `GET /api/digest/:night` with the same rows and ordering as the page. |
+| [#5](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/5) | Board links | §2c: link each night to its digest with ok / retry / fail event counts. |
+| [#6](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/6) | Route tests | §2d: cover HTML and JSON routes, missing and empty nights, and malformed lines using temporary fixtures. |
+| [#7](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/7) | Preview for review | §3: export the self-contained digest, publish on an approved public HTTPS host, and send the reviewer the link and issues. |
+| [#8](https://github.com/kuba-kowalczyk-allegro/mega-s01e04/issues/8) | Preview cleanup and plan archival | §4: replace the preview at the same URL with a marker-free copy, verify it, and archive this plan with its issue list. |
+
+## Review and cleanup record
+
+The course reviewer has seen the preview, and the human has approved marker removal and
+finishing the plan. This archive is prepared for integration only after the parent session
+verifies the marker-free deployment at the same public HTTPS URL, including the **no marker
+set** banner and successful upload removal described in `docs/preview.md`.
+
+Public verification evidence belongs in the GitHub #8 closing comment after successful
+deployment. This archival commit does not itself verify the public page or close #8, and
+contains neither a preview copy nor the lane marker.
