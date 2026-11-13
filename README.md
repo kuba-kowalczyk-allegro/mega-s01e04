@@ -10,3 +10,5 @@ pnpm dev               # http://localhost:8787
 ```
 
 Working on it with an agent: start at [AGENTS.md](AGENTS.md).
+
+Manual digest export and approved Pages publication: [preview guide](docs/preview.md).

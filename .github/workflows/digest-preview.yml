@@ -1,0 +1,85 @@
+name: Manual digest preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_marker:
+        description: 'Publish the lane marker (requires explicit human approval); false removes it'
+        type: boolean
+        required: true
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: digest-preview-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Export digest without logging HTML
+        env:
+          LANE_MARKER: ${{ inputs.include_marker && secrets.LANE_MARKER || '' }}
+          INCLUDE_MARKER: ${{ inputs.include_marker }}
+        run: |
+          if [ "$INCLUDE_MARKER" = "true" ] && [ -z "$LANE_MARKER" ]; then
+            echo 'LANE_MARKER repository secret is required for marker publication.' >&2
+            exit 1
+          fi
+          if [ "$INCLUDE_MARKER" != "true" ]; then
+            unset LANE_MARKER
+          fi
+          pnpm exec tsx scripts/export-preview.ts
+      - name: Upload short-lived Pages artifact
+        id: upload
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .tmp/preview
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  remove-upload:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete the upload artifact after successful deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+        run: gh api --method DELETE "repos/$GH_REPO/actions/artifacts/$ARTIFACT_ID"
