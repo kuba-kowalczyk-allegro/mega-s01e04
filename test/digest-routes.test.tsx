@@ -30,6 +30,16 @@ function text(html: string): string {
   ).trim();
 }
 
+function pageText(html: string): string {
+  // Unlike inline cell markup, adjacent blocks have a visible text boundary.
+  return text(html.replace(/<\/(?:p|h[1-6]|header|main|div|tr|table|section|li|ul|ol)>/gi, '$&\n'));
+}
+
+function numericCellValue(cell: string): number | undefined {
+  const match = /^(\d+)(?:\s+.+|\([^)]*\))?$/.exec(cell);
+  return match ? Number(match[1]) : undefined;
+}
+
 function tableRows(html: string) {
   return [...html.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)]
     .map(([markup]) => ({
@@ -42,13 +52,36 @@ function tableRows(html: string) {
 function expectRowFields(cells: string[], row: DigestRow) {
   const remaining = [...cells];
   for (const value of [
-    row.job, row.owner ?? '—', String(row.runs), String(row.retries),
+    row.job, row.owner ?? '—', row.runs, row.retries,
     row.lastStatus, row.lastError ?? '—', row.firstAt, row.lastAt,
   ]) {
-    expect(remaining, `visible field ${value} for ${row.job}`).toContain(value);
-    remaining.splice(remaining.indexOf(value), 1);
+    const index = remaining.findIndex((cell) => typeof value === 'number'
+      ? numericCellValue(cell) === value
+      : cell === value);
+    expect(index, `visible field ${value} for ${row.job}`).toBeGreaterThanOrEqual(0);
+    remaining.splice(index, 1);
   }
 }
+
+describe('digest route assertion helpers', () => {
+  it('allows numeric annotations without accepting a different number or nonnumeric suffix', () => {
+    for (const cell of ['3', '3 (high retries)', '3(high retries)', '3 high retries']) {
+      expect(numericCellValue(cell)).toBe(3);
+    }
+    for (const cell of ['30', '30 (high retries)', '13', '3.0', '3oops', '3e1', '-3']) {
+      expect(numericCellValue(cell)).not.toBe(3);
+    }
+  });
+
+  it('keeps block boundaries in page text and preserves exact inline cell text', () => {
+    expect(pageText('<p>malformed lines: <strong>2</strong></p><p>nothing ran</p>'))
+      .toBe('malformed lines: 2\nnothing ran');
+    expect(pageText('<p>malformed lines: 2</p><table><tr><th>job</th></tr></table>'))
+      .toBe('malformed lines: 2\njob');
+    expect(text('3 <span>(high retries)</span>')).toBe('3 (high retries)');
+    expect(text('exact<span>job</span>')).toBe('exactjob');
+  });
+});
 
 describe('digest routes', () => {
   let runsDir: string;
@@ -120,7 +153,7 @@ describe('digest routes', () => {
     expect(html).toMatch(/<main\b/i);
     expect(html).toMatch(/<style\b/i);
     expect(html).not.toMatch(/<script\b/i);
-    expect(text(html)).toContain(night);
+    expect(pageText(html)).toContain(night);
     expect(html.match(/<table\b/gi)).toHaveLength(1);
 
     const rows = tableRows(html);
@@ -173,7 +206,7 @@ describe('digest routes', () => {
     expect(await jsonResponse.json()).toEqual({ night, rows: [], counts: { ok: 0, retry: 0, fail: 0 }, malformedLines: 0 });
     expect(htmlResponse.status).toBe(200);
     const html = await htmlResponse.text();
-    expect(text(html)).toMatch(/nothing ran/i);
+    expect(pageText(html)).toMatch(/nothing ran/i);
     expect(tableRows(html)).toEqual([]);
   });
 
@@ -197,9 +230,9 @@ describe('digest routes', () => {
     expect(htmlResponse.status).toBe(200);
     const html = await htmlResponse.text();
     // Accept either label-first or count-first wording, without a markup contract.
-    expect(text(html)).toMatch(/(?:\b2\b[^.!\n]*malformed|malformed[^.!\n]*\b2\b)/i);
+    expect(pageText(html)).toMatch(/(?:\b2\b[^.!\n]*malformed|malformed[^.!\n]*\b2\b)/i);
     expect(tableRows(html)).toHaveLength(expectedRows.length);
-    if (allBad) expect(text(html)).toMatch(/nothing ran/i);
+    if (allBad) expect(pageText(html)).toMatch(/nothing ran/i);
     else expectRowFields(tableRows(html)[0].cells, expectedRows[0]);
   });
 
